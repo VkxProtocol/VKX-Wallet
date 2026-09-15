@@ -28,9 +28,17 @@ Both suites run in plain Node. No device, no emulator.
 | --- | --- |
 | `src/scryptProvider.ts` | Derives the encryption key from the PIN using scrypt. Uses a native implementation when one is present and proven correct against a test vector, and JavaScript otherwise. |
 | `src/cryptoEnvelope.ts` | Encrypts and decrypts a secret with AES-256-GCM, storing the KDF parameters inside the encrypted file. |
+| `src/keygen.ts` | Generates the 12-word phrase and derives the addresses for every supported chain, following BIP-39 and BIP-44. |
 
 These are the files that ship in the app, copied at the commit listed at the
 bottom. They were not rewritten for publication.
+
+`keygen.ts` carries two documented differences, both marked in the file and both
+about the runtime rather than the cryptography: React Native supplies a
+`crypto.getRandomValues` polyfill and a `require` function that Node provides or
+replaces differently. Without those two lines the file cannot be loaded here at
+all, and an unloadable file cannot be verified. Every derivation path, curve and
+byte below them is the app's.
 
 Their comments are in Portuguese, the working language of our team. We left them
 as they are, because they are the comments the app actually carries.
@@ -41,11 +49,6 @@ This repository is not the wallet.
 
 The routing engine, fee logic, payment rails and partner integrations are not
 included. None of them take part in protecting your keys.
-
-Key generation and address derivation (BIP-39 and BIP-44) are also absent, and
-that one is a real gap. They live in a file that depends on the React Native
-runtime, so this repository cannot load or test it. Shipping code that nobody
-can run proves nothing, so it stays out until it can be tested here.
 
 We have not been audited by a third party. When that happens, the report goes on
 the security page, findings included.
@@ -71,6 +74,29 @@ subtly broken implementation would fail:
   someone out of their own wallet.
 - `N`, `r` and the salt all change the output, so a weakened parameter cannot
   pass unnoticed.
+
+### `tests/derivation-vectors.spec.ts` — do we derive the same addresses as everyone else?
+
+Our security page promises that your 12 words restore your funds in any
+compatible wallet, even if VKX disappears. If our derivation drifted from the
+standard by one path component, that promise would be false, and nobody would
+find out until someone tried to recover elsewhere.
+
+The suite derives from the mnemonic BIP-39 itself uses for test vectors and
+compares against references published outside this project:
+
+- Bitcoin `bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu`, the first receiving
+  address in the BIP-84 test vectors.
+- Ethereum `0x9858EfFD232B4033E47d90003D41EC34EcaEda94`, the address this
+  mnemonic produces in every Ethereum wallet.
+
+TRON and Solana are pinned the same way. Import that mnemonic into any wallet
+using the same paths and you will get the same addresses.
+
+It also checks that the EVM chains share one address, that a second account
+index differs on every chain while the first stays put, and that a phrase
+failing the BIP-39 checksum produces no address at all — a typo must fail
+loudly, not send funds somewhere unrecoverable.
 
 ### `tests/envelope-policy.spec.ts` — is the cost high enough, and stable?
 
