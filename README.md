@@ -1,5 +1,10 @@
 # VKX Wallet — encryption core
 
+> **Scope:** this repository is **not** the full wallet application. It holds the
+> two modules that protect your keys on the device. Everything else — the
+> interface, routing, payment rails — is not here. See
+> [What is not here](#what-is-not-here).
+
 This repository holds the part of [VKX Wallet](https://wallet.vkxtech.com.br)
 that protects your keys while they sit on your device: the encryption at rest,
 and the key-derivation function that turns your PIN into an encryption key.
