@@ -35,6 +35,10 @@ so the website and this repository can be compared directly. See
 [`VERIFYING.md`](./VERIFYING.md) for a short verification procedure and, just as
 importantly, the limits of what the record proves.
 
+GitHub Actions also compares both JSON records every day and whenever this copy
+changes. A version published on only one side therefore makes the public sync
+check fail instead of drifting silently.
+
 The full application source and reproducible builds are not currently public.
 The production OTA bundles listed in the manifest were also built from a dirty
 working tree, so their reported application commit is informative but does not

@@ -1,0 +1,51 @@
+name: Release manifest sync
+
+on:
+  push:
+    paths:
+      - RELEASES.json
+      - .github/workflows/release-manifest-sync.yml
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare-public-records:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download official website manifest
+        run: >-
+          curl --fail --silent --show-error --retry 3
+          https://wallet.vkxtech.com.br/releases.json
+          --output "$RUNNER_TEMP/site-releases.json"
+
+      - name: Compare JSON records
+        env:
+          SITE_MANIFEST: ${{ runner.temp }}/site-releases.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          repository = json.loads(Path("RELEASES.json").read_text(encoding="utf-8"))
+          website = json.loads(Path(os.environ["SITE_MANIFEST"]).read_text(encoding="utf-8"))
+
+          if repository != website:
+              raise SystemExit(
+                  "RELEASES.json differs from "
+                  "https://wallet.vkxtech.com.br/releases.json"
+              )
+
+          print(
+              "Release records match: "
+              f"version {repository['appVersion']}, "
+              f"Android build {repository['platforms']['android']['versionCode']}, "
+              f"iOS build {repository['platforms']['ios']['buildNumber']}"
+          )
+          PY
