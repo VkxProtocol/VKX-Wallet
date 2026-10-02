@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-02T20:00:00-03:00",
+  "appVersion": "9.1.50",
+  "platforms": {
+    "android": {
+      "package": "com.vkinha.wallet",
+      "versionCode": 168,
+      "runtimeVersions": ["1", "9.1.21"]
+    },
+    "ios": {
+      "bundleIdentifier": "com.vkx.wallet",
+      "buildNumber": "216",
+      "runtimeVersions": ["1"]
+    }
+  },
+  "latestProductionUpdates": [
+    {
+      "platform": "android",
+      "runtimeVersion": "1",
+      "updateId": "01a0fe30-ccd8-754a-91b7-e9ba9f1b1bbd",
+      "updateGroupId": "fee196f0-a454-4786-911a-f1ba94e66e3b",
+      "publishedAt": "2026-10-02T19:56:46.168Z",
+      "manifestUrl": "https://u.expo.dev/update/01a0fe30-ccd8-754a-91b7-e9ba9f1b1bbd"
+    },
+    {
+      "platform": "android",
+      "runtimeVersion": "9.1.21",
+      "updateId": "01a0fe30-4334-7c84-a24e-7f9bfe28fe5d",
+      "updateGroupId": "ba5918d4-5455-4f03-bb99-2ad491e30a47",
+      "publishedAt": "2026-10-02T19:56:10.932Z",
+      "manifestUrl": "https://u.expo.dev/update/01a0fe30-4334-7c84-a24e-7f9bfe28fe5d"
+    },
+    {
+      "platform": "ios",
+      "runtimeVersion": "1",
+      "updateId": "01a0fe2f-9a7e-7b09-a283-f0bcc90d0db8",
+      "updateGroupId": "4192fc74-c561-4b53-8e7b-0117d1afbd82",
+      "publishedAt": "2026-10-02T19:55:27.742Z",
+      "manifestUrl": "https://u.expo.dev/update/01a0fe2f-9a7e-7b09-a283-f0bcc90d0db8"
+    }
+  ],
+  "source": {
+    "reportedGitCommit": "b4bc9e42fc13baea634d52ad37de6d31bc571a65",
+    "workingTreeClean": false,
+    "exactApplicationSourcePublished": false,
+    "warning": "The production updates were created from a modified working tree. The reported commit does not reproduce the exact published bundles."
+  },
+  "publicCore": {
+    "repository": "https://github.com/VkxProtocol/VKX-Wallet",
+    "commit": "762d018929a988486ffdec74b550c93cfea58cab",
+    "scope": "Key generation, address derivation, encryption at rest and PIN key derivation."
+  },
+  "verification": {
+    "releaseManifest": "published",
+    "publicSecurityCore": "published_with_tests",
+    "independentAudit": "not_completed",
+    "reproducibleBuild": "not_available",
+    "sbom": "not_published"
+  }
+}

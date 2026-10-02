@@ -22,6 +22,27 @@ Both suites run in plain Node. No device, no emulator.
 
 ---
 
+## Current production release
+
+The canonical public record is [`RELEASES.json`](./RELEASES.json). It currently
+identifies VKX Wallet technical version **9.1.50**, Android build **168** and iOS
+build **216**, together with the latest production OTA identifiers for every
+active runtime.
+
+The same file is published by the official website at
+[wallet.vkxtech.com.br/releases.json](https://wallet.vkxtech.com.br/releases.json),
+so the website and this repository can be compared directly. See
+[`VERIFYING.md`](./VERIFYING.md) for a short verification procedure and, just as
+importantly, the limits of what the record proves.
+
+The full application source and reproducible builds are not currently public.
+The production OTA bundles listed in the manifest were also built from a dirty
+working tree, so their reported application commit is informative but does not
+reproduce the exact bundle. We publish that limitation instead of claiming a
+level of verification that is not yet available.
+
+---
+
 ## What is here
 
 | File | Role |
