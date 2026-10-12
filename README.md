@@ -1,7 +1,7 @@
 # VKX Wallet — encryption core
 
 > **Scope:** this repository is **not** the full wallet application. It holds the
-> two modules that protect your keys on the device. Everything else — the
+> three modules that create and protect your keys on the device. Everything else — the
 > interface, routing, payment rails — is not here. See
 > [What is not here](#what-is-not-here).
 
@@ -18,7 +18,7 @@ npm install
 npm test
 ```
 
-Both suites run in plain Node. No device, no emulator.
+All test suites run in plain Node. No device, no emulator.
 
 ---
 
@@ -74,6 +74,9 @@ This repository is not the wallet.
 
 The routing engine, fee logic, payment rails and partner integrations are not
 included. None of them take part in protecting your keys.
+
+Transaction signing and dApp connection handling (WalletConnect) are not here
+either. They use your keys and are security-sensitive; they are not published yet.
 
 We have not been audited by a third party. When that happens, the report goes on
 the security page, findings included.
