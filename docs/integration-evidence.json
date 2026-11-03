@@ -1,0 +1,101 @@
+{
+  "checkedAt": "2026-11-03T13:40:38.465Z",
+  "method": "Public configuration GET requests; eth_chainId and eth_getCode at latest. No transactions submitted.",
+  "chains": [
+    {
+      "network": "BSC",
+      "chainId": 56,
+      "enabled": true,
+      "contractReady": true,
+      "paymaster": "0x39F01976686b906E1c6B0D243cB9dc1a33D21106",
+      "entryPoint": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
+      "observedChainId": 56,
+      "deployed": true,
+      "codeBytes": 5328,
+      "explorer": "https://bscscan.com/address/0x39F01976686b906E1c6B0D243cB9dc1a33D21106"
+    },
+    {
+      "network": "ETH",
+      "chainId": 1,
+      "enabled": false,
+      "contractReady": false,
+      "paymaster": "0xCbAC92a70fb50ab97990774566D50949Ada0bB3d",
+      "entryPoint": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
+      "observedChainId": 1,
+      "deployed": true,
+      "codeBytes": 5328,
+      "explorer": "https://etherscan.io/address/0xCbAC92a70fb50ab97990774566D50949Ada0bB3d"
+    },
+    {
+      "network": "BASE",
+      "chainId": 8453,
+      "enabled": true,
+      "contractReady": true,
+      "paymaster": "0x7Bd2024cAd405ccA960fE9989334A70153c41682",
+      "entryPoint": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
+      "observedChainId": 8453,
+      "deployed": true,
+      "codeBytes": 5328,
+      "explorer": "https://basescan.org/address/0x7Bd2024cAd405ccA960fE9989334A70153c41682"
+    },
+    {
+      "network": "ARB",
+      "chainId": 42161,
+      "enabled": true,
+      "contractReady": true,
+      "paymaster": "0xA6283Ae08849E1B2a10EF0204541c4B0f5C48b5F",
+      "entryPoint": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
+      "observedChainId": 42161,
+      "deployed": true,
+      "codeBytes": 5328,
+      "explorer": "https://arbiscan.io/address/0xA6283Ae08849E1B2a10EF0204541c4B0f5C48b5F"
+    },
+    {
+      "network": "MATIC",
+      "chainId": 137,
+      "enabled": true,
+      "contractReady": true,
+      "paymaster": "0x6a2dA242B0eEbc17706B9A046c6AA5ef37bDEc01",
+      "entryPoint": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
+      "observedChainId": 137,
+      "deployed": true,
+      "codeBytes": 5328,
+      "explorer": "https://polygonscan.com/address/0x6a2dA242B0eEbc17706B9A046c6AA5ef37bDEc01"
+    }
+  ],
+  "solana": {
+    "enabled": true,
+    "feePayer": "2C8Kxe2rZhAgfu6zTgiQPrtDHANaJVq8tij7YnPxrMb5"
+  },
+  "pix": {
+    "buyNetworks": [
+      "POLYGON",
+      "BSC",
+      "ETH",
+      "BASE",
+      "ROBINHOOD",
+      "SOLANA"
+    ],
+    "sellNetworks": [
+      "POLYGON",
+      "ETH",
+      "BSC",
+      "BASE",
+      "ROBINHOOD",
+      "TRON",
+      "SOLANA"
+    ],
+    "buyPaused": false
+  },
+  "transak": {
+    "environment": "PRODUCTION",
+    "catalogEntries": 143
+  },
+  "sources": {
+    "paymaster": "https://api.vkxtech.com.br/security/paymaster/chain-support",
+    "solana": "https://api.vkxtech.com.br/gas/subsidy/sol/config",
+    "pix": "https://api.vkxtech.com.br/wallet-pix/capabilities",
+    "transak": "https://api.vkxtech.com.br/api/transak/coverage",
+    "trading": "https://api.vkxtech.com.br/wallet-mira/config"
+  }
+}

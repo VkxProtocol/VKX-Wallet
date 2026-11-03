@@ -15,8 +15,9 @@ credentials, recovery phrases or private infrastructure details.
 Download both JSON files and compare the release fields. The app version,
 platform builds, production update IDs and public-core commit should match.
 
-The website is the canonical current record. The copy in GitHub makes changes
-reviewable in history.
+Both copies are historical release declarations. Matching records establishes
+consistency, not freshness: inspect the record date and compare with the installed
+app and current store release. The copy in GitHub makes changes reviewable in history.
 
 ## 2. Test the published security core
 
@@ -44,9 +45,10 @@ platform build identify the installed binary precisely.
 
 It verifies that:
 
-- the website and GitHub declare the same production release;
+- the website and GitHub contain the same historical release declaration;
 - the public security core exists at a fixed commit and its tests can be run;
-- an installed app can be matched to a declared production update ID.
+- an installed app can be compared with a recorded production update ID; a mismatch
+  can indicate that the record is older than the installed app.
 
 It does **not** prove that the complete application was built from the reported
 commit. The full app source is not public, the current bundles were produced

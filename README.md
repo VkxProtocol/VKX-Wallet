@@ -22,12 +22,33 @@ All test suites run in plain Node. No device, no emulator.
 
 ---
 
-## Current production release
+## Wallet integrations and production evidence
 
-The canonical public record is [`RELEASES.json`](./RELEASES.json). It currently
-identifies VKX Wallet technical version **9.1.50**, Android build **168** and iOS
-build **216**, together with the latest production OTA identifiers for every
-active runtime.
+The application integrates sponsored execution on BNB Smart Chain, Base,
+Arbitrum One, Polygon PoS and Solana, subject to eligibility. Its fiat rails
+include **Transak** for card purchases and **XGate / Pix** for BRL payments.
+Trading funding uses native USDC on Arbitrum One.
+
+- [Multichain Integration Overview](./docs/INTEGRATIONS.md)
+- [Visão técnica em português](./docs/INTEGRATIONS.pt-BR.md)
+- [Dated infrastructure evidence](./docs/integration-evidence.json)
+- Published pages: [English](https://wallet.vkxtech.com.br/wallet-integrations.html)
+  · [Português](https://wallet.vkxtech.com.br/wallet-integrations-pt.html)
+
+The overview documents architecture, network eligibility, partner roles and
+public contract references checked on 3 November 2026. Ethereum sponsorship was
+disabled at that snapshot. Deployment evidence does not establish usage metrics
+or constitute an independent audit. Integration documentation describes the
+application; its proprietary implementation is outside this repository.
+
+---
+
+## Public release record
+
+[`RELEASES.json`](./RELEASES.json) is a historical public record of technical
+versions, platform build numbers and production OTA identifiers. Check the
+record date: it does not automatically establish the latest store release or
+the version currently installed on a device.
 
 The same file is published by the official website at
 [wallet.vkxtech.com.br/releases.json](https://wallet.vkxtech.com.br/releases.json),
