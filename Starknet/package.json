@@ -1,0 +1,17 @@
+{
+  "name": "@vkx/wallet-starknet",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "tsx tests/starknet-core.spec.ts",
+    "vectors": "tsx scripts/starknet-vectors.ts"
+  },
+  "dependencies": {
+    "ethers": "6.16.0",
+    "starknet": "10.8.0"
+  },
+  "devDependencies": {
+    "tsx": "4.21.0"
+  }
+}

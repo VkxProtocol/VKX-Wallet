@@ -1,0 +1,8 @@
+[package]
+name = "stark-ref"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+starknet-core = "=0.16.0"
+starknet-crypto = "=0.8.1"
