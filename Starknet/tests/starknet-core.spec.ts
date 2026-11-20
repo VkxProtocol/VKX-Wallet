@@ -27,6 +27,7 @@ import {
   sendStarknetToken,
   signStarknetHash,
   starknetAccountFromPrivateKey,
+  starknetEstimationKeys,
   verifyStarknetHash,
   STARKNET_TOKENS,
 } from '../src/starknet';
@@ -394,6 +395,19 @@ const ONE = 10n ** 18n;
     sim.balances = { ETH: ONE, STRK: 10n * ONE };
     sim.receipt = 'REVERTED';
     await expectCode(sendStarknetToken({ keys, token: 'ETH', to: RECIPIENT, amount: 1n }, 'sepolia'), 'TX_REVERTED');
+  });
+
+  await test('chaves de estimativa: só dados públicos, conferem endereço e nunca transmitem', async () => {
+    const est = starknetEstimationKeys(VECTORS[0].address, VECTORS[0].publicKey);
+    assert.equal(est.address, VECTORS[0].address);
+    assert.notEqual(est.privateKey, VECTORS[0].privateKey);
+    await expectCode(() => starknetEstimationKeys(VECTORS[0].address, VECTORS[1].publicKey), 'INVALID_ADDRESS');
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    await expectCode(sendStarknetToken({ keys: est, token: 'STRK', to: RECIPIENT, amount: 1n }, 'sepolia'), 'INVALID_PRIVATE_KEY');
+    // chave real de OUTRA conta com o endereço desta: barrada antes da rede
+    await expectCode(sendStarknetToken({ keys: { ...keys, privateKey: VECTORS[1].privateKey }, token: 'STRK', to: RECIPIENT, amount: 1n }, 'sepolia'), 'INVALID_PRIVATE_KEY');
+    assert.equal(bodies.length, 0);
   });
 
   await test('nenhuma chave privada sai em requisição alguma', () => {

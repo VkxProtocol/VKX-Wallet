@@ -7,12 +7,13 @@ Starknet support for VKX Wallet: account derivation from the wallet's BIP39 phra
 | Path | Content |
 |---|---|
 | `src/starknet.ts` | Starknet module used by the app (starknet.js 10.8.0) |
-| `tests/starknet-core.spec.ts` | 24 offline tests |
+| `tests/starknet-core.spec.ts` | 25 offline tests |
 | `scripts/starknet-vectors.ts` | Derivation vectors from the module |
 | `scripts/starknet-sepolia-poc.ts` | On-chain run: status, deploy, transfer |
 | `reference/python/ref.py` | Independent reference (standard library only) |
 | `reference/rust/` | Independent reference (starknet-crypto 0.8.1, starknet-core 0.16.0) |
 | `evidence/sepolia-evidence.json` | Recorded on-chain results |
+| `screenshots/` | In-app flow on Android |
 
 ## Design
 
@@ -42,6 +43,18 @@ Keys and public keys match the Python reference; public keys and addresses match
 
 Account 0: `0x0279042774675b647df5f1214bc50584a9c70ffad80cfc52542d43bdc61d0d5d`
 Account 1: `0x03577bbaaf5e79c22aec7c10f05c69e62fa94336bbebd8a03b2a3bbb2df5f2e5`
+
+## In-app (Android emulator, Hermes, 2026-11-20 UTC)
+
+Starknet Sepolia enabled only by a build-time flag (`EXPO_PUBLIC_STARKNET_NETWORK=sepolia`); no value enables mainnet. Wallets imported by recovery phrase; addresses generated on the device with the PIN and matching the reference vectors.
+
+| Operation | Transaction | Block | Result |
+|---|---|---|---|
+| Transfer 0.05 STRK, account 0 → account 1 | [0x024023dd…6cc232e](https://sepolia.voyager.online/tx/0x024023dd601c51c28677b45207a3545e4f69b992e3594cd83c8c287e36cc232e) | 18454499 | SUCCEEDED |
+| Deploy `0x04ee2ac5…334c76d2` (vector i=0) on its first transfer | [0x02a9f73d…c35c086](https://sepolia.voyager.online/tx/0x02a9f73d9e1cd7e3ddad775f673e9f811cba0413750fd276fd771bf98c35c086) | 18454732 | SUCCEEDED |
+| Transfer 0.1 STRK, `0x04ee2ac5…` → account 1 | [0x0111b869…0d6988](https://sepolia.voyager.online/tx/0x0111b8690074f3f731d80b1e5de6edd6f6125b072f1b85681c220c118a0d6988) | 18454736 | SUCCEEDED |
+
+Account 1 balance: 0.10 → 0.15 → 0.25 STRK. Fee and account activation are estimated from public data and confirmed by the user before the PIN; signing happens on the device. Screenshots in `screenshots/`.
 
 ## Run
 

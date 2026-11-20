@@ -259,6 +259,30 @@ export function starknetAccountFromPrivateKey(privateKey: string): StarknetAccou
   return { ...kp, address: computeStarknetAccountAddress(kp.publicKey), classHash: OZ_ACCOUNT_CLASS_HASH };
 }
 
+// Chave fixa e PÚBLICA, só para estimar taxa antes do PIN: a estimativa da
+// Starknet não valida a assinatura, então basta endereço + chave pública reais.
+// Nunca assina nada que vá para a rede (assertSigningKeys barra).
+const ESTIMATE_ONLY_PRIVATE_KEY = `0x${'0'.repeat(63)}1`;
+
+/** Chaves só para estimar taxa (sem segredo). Confere que a chave pública gera o endereço. */
+export function starknetEstimationKeys(address: string, publicKey: string): StarknetAccountKeys {
+  const addr = normalizeStarknetAddress(address);
+  const pub = pad64(publicKey);
+  if (computeStarknetAccountAddress(pub) !== addr) {
+    throw new StarknetError('INVALID_ADDRESS', 'A chave pública não corresponde a este endereço Starknet.');
+  }
+  return { privateKey: ESTIMATE_ONLY_PRIVATE_KEY, publicKey: pub, address: addr, classHash: OZ_ACCOUNT_CLASS_HASH };
+}
+
+/** Antes de transmitir: a chave privada tem de gerar a chave pública e o endereço da conta. */
+function assertSigningKeys(keys: StarknetAccountKeys): void {
+  const kp = starknetKeyPairFromPrivateKey(keys.privateKey);
+  if (kp.privateKey === pad64(ESTIMATE_ONLY_PRIVATE_KEY) || kp.publicKey !== pad64(keys.publicKey)
+    || computeStarknetAccountAddress(kp.publicKey, keys.classHash) !== pad64(keys.address)) {
+    throw new StarknetError('INVALID_PRIVATE_KEY', 'A chave não corresponde a esta conta Starknet.');
+  }
+}
+
 /** Só o que pode aparecer em tela/log: endereço e chave pública. */
 export function publicStarknetAccount(acc: StarknetAccountKeys) {
   return { address: acc.address, publicKey: acc.publicKey, classHash: acc.classHash, derivationPath: acc.derivationPath };
@@ -555,6 +579,7 @@ export async function deployStarknetAccount(
   network: StarknetNetworkName = getStarknetNetworkName(),
   opts: { wait?: boolean } = {},
 ): Promise<StarknetTxOutcome & { alreadyDeployed?: boolean }> {
+  assertSigningKeys(keys);
   return serialized(keys.address, async () => {
     const state = await getStarknetAccountState(keys.address, network);
     if (state.deployed) {
@@ -601,6 +626,7 @@ export async function sendStarknetToken(
   const { keys, token, amount } = params;
   if (typeof amount !== 'bigint' || amount <= 0n) throw new StarknetError('INVALID_AMOUNT', 'O valor precisa ser maior que zero.');
   const to = normalizeStarknetAddress(params.to);
+  assertSigningKeys(keys);
   if (to === pad64(keys.address)) throw new StarknetError('SELF_TRANSFER', 'O destino é o seu próprio endereço Starknet.');
 
   // Saldo e taxa checados ANTES de qualquer assinatura.
