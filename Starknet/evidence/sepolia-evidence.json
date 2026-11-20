@@ -139,5 +139,50 @@
     "recipientBalanceAfter": "0.25",
     "explorer": "https://sepolia.voyager.online/tx/0x0111b8690074f3f731d80b1e5de6edd6f6125b072f1b85681c220c118a0d6988",
     "blockTime": "2026-11-20T23:17:02.000Z"
+  },
+  {
+    "network": "starknet-sepolia",
+    "chainId": "0x534e5f5345504f4c4941",
+    "kind": "transfer",
+    "origin": "script (funding OZ 3.x test account)",
+    "token": "STRK",
+    "amount": "1",
+    "from": "0x0279042774675b647df5f1214bc50584a9c70ffad80cfc52542d43bdc61d0d5d",
+    "to": "0x01114046a6e88c41f4dd138a39ccff82c49d93a1d9dea4c667239b1e73520483",
+    "txHash": "0x06e56d1eac31973427bf2fdfe3e8713c5400d3696d730ea587d10969a46ab139",
+    "result": "confirmed",
+    "finality": "ACCEPTED_ON_L2",
+    "blockNumber": 18455357,
+    "explorer": "https://sepolia.voyager.online/tx/0x06e56d1eac31973427bf2fdfe3e8713c5400d3696d730ea587d10969a46ab139"
+  },
+  {
+    "network": "starknet-sepolia",
+    "chainId": "0x534e5f5345504f4c4941",
+    "kind": "deploy_account",
+    "origin": "script (OZ 3.x, mainnet candidate class)",
+    "address": "0x01114046a6e88c41f4dd138a39ccff82c49d93a1d9dea4c667239b1e73520483",
+    "publicKey": "0x0220c963e0d97f47d5f013c0ac855f22767bfccba0ecd477fcbf460f87ef7df6",
+    "classHash": "0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381",
+    "txHash": "0x06b50cd79ec6229244d2a469191bebabb4068f2309fdf418200438bdbd9629f6",
+    "result": "confirmed",
+    "explorer": "https://sepolia.voyager.online/tx/0x06b50cd79ec6229244d2a469191bebabb4068f2309fdf418200438bdbd9629f6"
+  },
+  {
+    "network": "starknet-sepolia",
+    "chainId": "0x534e5f5345504f4c4941",
+    "kind": "transfer",
+    "origin": "script (OZ 3.x account)",
+    "token": "STRK",
+    "amount": "0.05",
+    "from": "0x01114046a6e88c41f4dd138a39ccff82c49d93a1d9dea4c667239b1e73520483",
+    "to": "0x03577bbaaf5e79c22aec7c10f05c69e62fa94336bbebd8a03b2a3bbb2df5f2e5",
+    "txHash": "0x04c37860334abf98f8562a5ee37a06323c54d06cfd4ff7d82f073f545a7f810c",
+    "result": "confirmed",
+    "finality": "ACCEPTED_ON_L2",
+    "blockNumber": 18455369,
+    "actualFeeFri": "36911500728835718",
+    "recipientBalanceBefore": "250000000000000000",
+    "recipientBalanceAfter": "300000000000000000",
+    "explorer": "https://sepolia.voyager.online/tx/0x04c37860334abf98f8562a5ee37a06323c54d06cfd4ff7d82f073f545a7f810c"
   }
 ]

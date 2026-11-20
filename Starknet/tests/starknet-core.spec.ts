@@ -30,6 +30,13 @@ import {
   starknetEstimationKeys,
   verifyStarknetHash,
   STARKNET_TOKENS,
+  OZ_ACCOUNT_CLASS_HASH_V3,
+  STARKNET_MAINNET_CANDIDATE,
+  STARKNET_MAINNET_RELEASE_APPROVED,
+  classifyStarknetTxStatus,
+  starknetAccountClassHash,
+  waitForStarknetTransaction,
+  deployStarknetAccount,
 } from '../src/starknet';
 
 const PHRASE = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -98,6 +105,9 @@ const sim = {
   balances: { ETH: 0n, STRK: 0n } as Record<string, bigint>,
   failUrls: new Set<string>(),
   receipt: 'SUCCEEDED' as 'SUCCEEDED' | 'REVERTED',
+  // status devolvido por starknet_getTransactionStatus; null = "hash não encontrado"
+  txStatus: undefined as undefined | null | { finality_status?: string; execution_status?: string },
+  failBroadcastUrl: '' as string,
   estimateRevertsWith: '' as string,
 };
 
@@ -132,7 +142,8 @@ function rpcResult(req: { method: string; params: any }, url: string): { result?
     case 'starknet_addInvokeTransaction': return { result: { transaction_hash: '0xabc1' } };
     case 'starknet_addDeployAccountTransaction': return { result: { transaction_hash: '0xde91', contract_address: VECTORS[0].address } };
     case 'starknet_getTransactionStatus':
-      return { result: { finality_status: 'ACCEPTED_ON_L2', execution_status: sim.receipt } };
+      if (sim.txStatus === null) return { error: { code: 29, message: 'Transaction hash not found' } };
+      return { result: sim.txStatus ?? { finality_status: 'ACCEPTED_ON_L2', execution_status: sim.receipt } };
     case 'starknet_getTransactionReceipt':
       return {
         result: {
@@ -152,6 +163,7 @@ function rpcResult(req: { method: string; params: any }, url: string): { result?
   bodies.push(body);
   allBodies.push(body);
   if (sim.failUrls.has(url)) return new Response('bad gateway', { status: 502 });
+  if (sim.failBroadcastUrl === url && /starknet_add/.test(body)) return new Response('bad gateway', { status: 502 });
   const parsed = JSON.parse(body);
   const one = (r: any) => {
     rpcLog.push({ method: r.method, params: r.params, url });
@@ -169,6 +181,8 @@ function resetSim() {
   sim.failUrls.clear();
   sim.receipt = 'SUCCEEDED';
   sim.estimateRevertsWith = '';
+  sim.txStatus = undefined;
+  sim.failBroadcastUrl = '';
   __resetStarknetSendQueue();
 }
 
@@ -341,7 +355,7 @@ const ONE = 10n ** 18n;
     resetSim();
     sim.balances = { ETH: ONE, STRK: 10n * ONE };
     const res = await sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: ONE }, 'sepolia');
-    assert.equal(res.status, 'succeeded');
+    assert.equal(res.status, 'confirmed');
     assert.equal(res.txHash, `0x${'0'.repeat(60)}abc1`);
     assert.equal(res.blockNumber, 101);
     assert.equal(res.deployTxHash, undefined);
@@ -378,7 +392,7 @@ const ONE = 10n ** 18n;
     assert.equal(BigInt(dep.class_hash), BigInt(OZ_ACCOUNT_CLASS_HASH));
     assert.equal(BigInt(dep.contract_address_salt), BigInt(keys.publicKey));
     assert.deepEqual(dep.constructor_calldata.map((x: string) => BigInt(x)), [BigInt(keys.publicKey)]);
-    assert.equal(res.status, 'succeeded');
+    assert.equal(res.status, 'confirmed');
     assert.ok(res.deployTxHash);
   });
 
@@ -408,6 +422,135 @@ const ONE = 10n ** 18n;
     // chave real de OUTRA conta com o endereço desta: barrada antes da rede
     await expectCode(sendStarknetToken({ keys: { ...keys, privateKey: VECTORS[1].privateKey }, token: 'STRK', to: RECIPIENT, amount: 1n }, 'sepolia'), 'INVALID_PRIVATE_KEY');
     assert.equal(bodies.length, 0);
+  });
+
+  // ---------------- Fase 3: estados, negativos, mainnet ----------------
+  const FAST = { timeoutMs: 60, retryIntervalMs: 10 };
+
+  await test('classificação de status: só ACCEPTED + SUCCEEDED explícitos confirmam', () => {
+    const c = classifyStarknetTxStatus;
+    assert.equal(c({ finality_status: 'ACCEPTED_ON_L2', execution_status: 'SUCCEEDED' }), 'confirmed');
+    assert.equal(c({ finality_status: 'ACCEPTED_ON_L1', execution_status: 'SUCCEEDED' }), 'confirmed');
+    assert.equal(c({ finality_status: 'ACCEPTED_ON_L2' }), 'pending'); // execução ausente
+    assert.equal(c({ finality_status: 'PRE_CONFIRMED', execution_status: 'SUCCEEDED' }), 'pending');
+    assert.equal(c({ finality_status: 'RECEIVED' }), 'pending');
+    assert.equal(c({ finality_status: 'CANDIDATE' }), 'pending');
+    assert.equal(c({ finality_status: 'ACCEPTED_ON_L2', execution_status: 'REVERTED' }), 'reverted');
+    assert.equal(c({ finality_status: 'REJECTED' }), 'rejected');
+    assert.equal(c(null), 'pending');
+    assert.equal(c({}), 'pending');
+  });
+
+  await test('wait:false devolve pending (nunca sucesso) e não consulta status', async () => {
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    const res = await sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 1n, wait: false }, 'sepolia');
+    assert.equal(res.status, 'pending');
+    assert.ok(!methods().includes('starknet_getTransactionStatus'));
+  });
+
+  await test('status sem execution_status nunca vira sucesso: termina em timeout', async () => {
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    sim.txStatus = { finality_status: 'ACCEPTED_ON_L2' };
+    const res = await sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 1n, waitOptions: FAST }, 'sepolia');
+    assert.equal(res.status, 'timeout');
+    assert.ok(res.txHash.startsWith('0x'));
+  });
+
+  await test('hash ainda não visto pelo nó: timeout sem lançar erro (não induz reenvio)', async () => {
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    sim.txStatus = null;
+    const res = await sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 1n, waitOptions: FAST }, 'sepolia');
+    assert.equal(res.status, 'timeout');
+    assert.equal(methods().filter((m) => m === 'starknet_addInvokeTransaction').length, 1, 'uma única transmissão');
+  });
+
+  await test('rejeitada pela rede vira TX_REJECTED', async () => {
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    sim.txStatus = { finality_status: 'REJECTED' };
+    await expectCode(sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 1n, waitOptions: FAST }, 'sepolia'), 'TX_REJECTED');
+  });
+
+  await test('espera avulsa: pending vira timeout; confirmado traz bloco e taxa', async () => {
+    resetSim();
+    sim.txStatus = { finality_status: 'RECEIVED' };
+    assert.equal((await waitForStarknetTransaction('0xabc1', 'sepolia', FAST)).status, 'timeout');
+    sim.txStatus = undefined;
+    const ok = await waitForStarknetTransaction('0xabc1', 'sepolia', FAST);
+    assert.equal(ok.status, 'confirmed');
+    assert.equal(ok.blockNumber, 101);
+    assert.equal(ok.actualFee, 0x5000n);
+  });
+
+  await test('ativação sem confirmação: lança TX_TIMEOUT e NÃO transmite a transferência', async () => {
+    resetSim();
+    sim.deployed = false;
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    sim.txStatus = { finality_status: 'RECEIVED' };
+    await expectCode(sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 1n, waitOptions: FAST }, 'sepolia'), 'TX_TIMEOUT');
+    assert.deepEqual(methods().filter((m) => m.startsWith('starknet_add')), ['starknet_addDeployAccountTransaction']);
+  });
+
+  await test('ativação com wait:false devolve pending', async () => {
+    resetSim();
+    sim.deployed = false;
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    const r = await deployStarknetAccount(keys, 'sepolia', { wait: false });
+    assert.equal(r.status, 'pending');
+  });
+
+  await test('falha no nó de transmissão: BROADCAST_FAILED e nenhum outro nó recebe a transação', async () => {
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    const [first, second] = getStarknetRpcUrls('sepolia');
+    sim.failBroadcastUrl = first;
+    await expectCode(sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 1n, waitOptions: FAST }, 'sepolia'), 'BROADCAST_FAILED');
+    assert.ok(!rpcLog.some((r) => r.url !== first && r.method.startsWith('starknet_add')), 'sem reenvio em outro nó');
+    void second;
+  });
+
+  await test('envios simultâneos do mesmo remetente são serializados (sem disputa de nonce)', async () => {
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    const [a, b] = await Promise.all([
+      sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 1n, waitOptions: FAST }, 'sepolia'),
+      sendStarknetToken({ keys, token: 'STRK', to: RECIPIENT, amount: 2n, waitOptions: FAST }, 'sepolia'),
+    ]);
+    assert.equal(a.status, 'confirmed');
+    assert.equal(b.status, 'confirmed');
+    const m = methods();
+    const adds = m.map((x, i) => [x, i] as const).filter(([x]) => x === 'starknet_addInvokeTransaction').map(([, i]) => i);
+    assert.equal(adds.length, 2);
+    const firstConfirm = m.indexOf('starknet_getTransactionStatus', adds[0]);
+    assert.ok(firstConfirm > adds[0] && firstConfirm < adds[1], 'o 2º envio só sai depois do 1º confirmar');
+    const nonceBefore2nd = m.lastIndexOf('starknet_getNonce', adds[1]);
+    assert.ok(nonceBefore2nd > firstConfirm, 'o nonce do 2º envio é lido depois do 1º confirmar');
+  });
+
+  await test('mainnet: travada no código, candidata com SN_MAIN e classe OZ 3.x', async () => {
+    assert.equal(STARKNET_MAINNET_RELEASE_APPROVED, false);
+    assert.deepEqual(getStarknetRpcUrls('mainnet'), []);
+    assert.equal(STARKNET_MAINNET_CANDIDATE.chainId, '0x534e5f4d41494e');
+    assert.equal(STARKNET_MAINNET_CANDIDATE.accountClassHash, OZ_ACCOUNT_CLASS_HASH_V3);
+    assert.equal(starknetAccountClassHash('mainnet'), OZ_ACCOUNT_CLASS_HASH_V3);
+    assert.equal(starknetAccountClassHash('sepolia'), OZ_ACCOUNT_CLASS_HASH);
+    resetSim();
+    await expectCode(waitForStarknetTransaction('0xabc1', 'mainnet', FAST), 'NETWORK_DISABLED');
+    await expectCode(deployStarknetAccount(keys, 'mainnet'), 'NETWORK_DISABLED');
+    assert.equal(bodies.length, 0, 'nenhuma requisição para mainnet');
+  });
+
+  await test('OZ 3.x: endereços batem com a referência Rust (starknet-core)', () => {
+    // Calculados com reference/rust (key <classe 3.x> <chave>) em 20/11/2026.
+    assert.equal(deriveStarknetAccountFromMnemonic(PHRASE, 0, OZ_ACCOUNT_CLASS_HASH_V3).address,
+      '0x02000ba5ba904aed0858233e8f782bbc07fd31298824074e05a871f28642342c');
+    assert.equal(deriveStarknetAccountFromMnemonic(PHRASE, 1, OZ_ACCOUNT_CLASS_HASH_V3).address,
+      '0x01bb6a88898af0b5a40b60654ba38c802790d27aecbb34483ff1a91c7584a683');
+    // mesma chave, classe diferente => endereço diferente (a classe define a conta)
+    assert.notEqual(deriveStarknetAccountFromMnemonic(PHRASE, 0, OZ_ACCOUNT_CLASS_HASH_V3).address, VECTORS[0].address);
   });
 
   await test('nenhuma chave privada sai em requisição alguma', () => {

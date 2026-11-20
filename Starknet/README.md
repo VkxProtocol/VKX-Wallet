@@ -7,9 +7,13 @@ Starknet support for VKX Wallet: account derivation from the wallet's BIP39 phra
 | Path | Content |
 |---|---|
 | `src/starknet.ts` | Starknet module used by the app (starknet.js 10.8.0) |
-| `tests/starknet-core.spec.ts` | 25 offline tests |
+| `tests/starknet-core.spec.ts` | 37 offline tests |
 | `scripts/starknet-vectors.ts` | Derivation vectors from the module |
 | `scripts/starknet-sepolia-poc.ts` | On-chain run: status, deploy, transfer |
+| `scripts/starknet-mainnet-readiness.ts` | Read-only mainnet configuration check |
+| `REPORT.md` | Proof-of-concept report |
+| `MAINNET-READINESS.md` | Mainnet readiness (mainnet locked) |
+| `LICENSE` | MIT, this directory only |
 | `reference/python/ref.py` | Independent reference (standard library only) |
 | `reference/rust/` | Independent reference (starknet-crypto 0.8.1, starknet-core 0.16.0) |
 | `evidence/sepolia-evidence.json` | Recorded on-chain results |
@@ -19,11 +23,12 @@ Starknet support for VKX Wallet: account derivation from the wallet's BIP39 phra
 
 - Derivation: BIP39 → BIP32 `m/44'/9004'/0'/0/i` → StarkWare key grinding.
 - Account: OpenZeppelin `AccountUpgradeable` 4.x, class `0x03013bf2edcf93ac575367eee41cd07bb50e809c78925817b61878db29826144`; salt and constructor argument = public key.
-- Transactions V3, fees in STRK, estimated before signing. Mainnet has no RPC configured.
+- Transactions V3, fees in STRK, estimated before signing. States: `pending`, `confirmed`, `reverted`, `rejected`, `timeout`.
+- Mainnet locked by a code constant (`STARKNET_MAINNET_RELEASE_APPROVED = false`); candidate configuration uses OpenZeppelin 3.x, the version declared on both mainnet and Sepolia. See `MAINNET-READINESS.md`.
 
 ## Derivation vectors
 
-Phrase: `abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about` (public BIP39 test phrase).
+Phrase: `abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about` (public BIP39 test phrase; its accounts are test-only and must never hold real funds).
 
 | i | Stark private key | Public key | Address |
 |---|---|---|---|

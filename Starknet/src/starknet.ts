@@ -47,9 +47,48 @@ export type StarknetTokenSymbol = 'ETH' | 'STRK';
 /** Caminho BIP44 da Starknet (coin type 9004). Índice = índice HD da conta VKX. */
 export const STARKNET_DERIVATION_PATH_BASE = "m/44'/9004'/0'/0";
 
-/** OpenZeppelin AccountUpgradeable, cairo-contracts 4.x (Scarb 2.18.0, --release). */
+/** OpenZeppelin AccountUpgradeable, cairo-contracts 4.x (Scarb 2.18.0, --release). Só declarada na Sepolia. */
 export const OZ_ACCOUNT_CLASS_HASH =
   '0x03013bf2edcf93ac575367eee41cd07bb50e809c78925817b61878db29826144';
+/**
+ * OpenZeppelin AccountUpgradeable, cairo-contracts 3.x (Scarb 2.13.1, --release).
+ * Declarada na mainnet E na Sepolia (conferido 20/11/2026: hash recalculado do
+ * código baixado do nó, construtor (public_key)). A 4.x NÃO existe na mainnet.
+ */
+export const OZ_ACCOUNT_CLASS_HASH_V3 =
+  '0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381';
+
+/**
+ * Liberação da mainnet. Muda SÓ editando este literal numa revisão aprovada pelo
+ * dono. Nenhuma variável de ambiente, flag remota ou tela altera este valor.
+ * Enquanto for false, a mainnet não tem RPC: leitura, assinatura e envio falham
+ * com NETWORK_DISABLED antes de qualquer requisição.
+ */
+export const STARKNET_MAINNET_RELEASE_APPROVED: boolean = false;
+
+/** Configuração CANDIDATA da mainnet (Fase 3). Só usada se a constante acima virar true. */
+export const STARKNET_MAINNET_CANDIDATE = Object.freeze({
+  chainId: '0x534e5f4d41494e', // "SN_MAIN"
+  // Conferidos 20/11/2026 (scripts/starknet-mainnet-readiness.ts): SN_MAIN,
+  // tokens oficiais e classe OZ 3.x. O drpc público foi REPROVADO (não tem
+  // starknet_blockNumber). Antes de liberar: somar um 3º RPC (provedor pago).
+  rpcUrls: Object.freeze([
+    'https://api.zan.top/public/starknet-mainnet/rpc/v0_9',
+    'https://starknet-rpc.publicnode.com',
+  ]),
+  explorerUrl: 'https://voyager.online',
+  accountClassHash: OZ_ACCOUNT_CLASS_HASH_V3,
+});
+
+/** Classe da conta usada para CALCULAR o endereço em cada rede. */
+const ACCOUNT_CLASS_BY_NETWORK: Record<'sepolia' | 'mainnet', string> = {
+  sepolia: OZ_ACCOUNT_CLASS_HASH,
+  mainnet: STARKNET_MAINNET_CANDIDATE.accountClassHash,
+};
+
+export function starknetAccountClassHash(network: 'sepolia' | 'mainnet' = 'sepolia'): string {
+  return ACCOUNT_CLASS_BY_NETWORK[network];
+}
 
 /** Ordem da curva Stark: chave privada válida está em [1, N-1]. */
 export const STARK_CURVE_ORDER = 0x0800000000000010ffffffffffffffffb781126dcae7b2321e66a241adc64d2fn;
@@ -77,7 +116,8 @@ const RPC_URLS: Record<StarknetNetworkName, string[]> = {
     'https://starknet-sepolia-rpc.publicnode.com',
     'https://starknet-sepolia.drpc.org',
   ],
-  mainnet: [],
+  // Vazio até a liberação explícita (ver STARKNET_MAINNET_RELEASE_APPROVED).
+  mainnet: STARKNET_MAINNET_RELEASE_APPROVED ? [...STARKNET_MAINNET_CANDIDATE.rpcUrls] : [],
 };
 
 const CHAIN_IDS: Record<StarknetNetworkName, string> = {
@@ -87,7 +127,7 @@ const CHAIN_IDS: Record<StarknetNetworkName, string> = {
 
 const EXPLORER_URLS: Record<StarknetNetworkName, string> = {
   sepolia: 'https://sepolia.voyager.online',
-  mainnet: 'https://voyager.online',
+  mainnet: STARKNET_MAINNET_CANDIDATE.explorerUrl,
 };
 
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -110,7 +150,8 @@ export type StarknetErrorCode =
   | 'RPC_UNAVAILABLE'
   | 'TX_REVERTED'
   | 'TX_REJECTED'
-  | 'TX_TIMEOUT';
+  | 'TX_TIMEOUT'
+  | 'BROADCAST_FAILED';
 
 export class StarknetError extends Error {
   readonly code: StarknetErrorCode;
@@ -249,14 +290,18 @@ export function computeStarknetAccountAddress(publicKey: string, classHash: stri
   return pad64(hash.calculateContractAddressFromHash(pub, classHash, [pub], 0));
 }
 
-export function deriveStarknetAccountFromMnemonic(mnemonic: string, index: number = 0): StarknetAccountKeys {
+export function deriveStarknetAccountFromMnemonic(
+  mnemonic: string,
+  index: number = 0,
+  classHash: string = OZ_ACCOUNT_CLASS_HASH,
+): StarknetAccountKeys {
   const kp = deriveStarknetKeyPairFromMnemonic(mnemonic, index);
-  return { ...kp, address: computeStarknetAccountAddress(kp.publicKey), classHash: OZ_ACCOUNT_CLASS_HASH };
+  return { ...kp, address: computeStarknetAccountAddress(kp.publicKey, classHash), classHash: pad64(classHash) };
 }
 
-export function starknetAccountFromPrivateKey(privateKey: string): StarknetAccountKeys {
+export function starknetAccountFromPrivateKey(privateKey: string, classHash: string = OZ_ACCOUNT_CLASS_HASH): StarknetAccountKeys {
   const kp = starknetKeyPairFromPrivateKey(privateKey);
-  return { ...kp, address: computeStarknetAccountAddress(kp.publicKey), classHash: OZ_ACCOUNT_CLASS_HASH };
+  return { ...kp, address: computeStarknetAccountAddress(kp.publicKey, classHash), classHash: pad64(classHash) };
 }
 
 // Chave fixa e PÚBLICA, só para estimar taxa antes do PIN: a estimativa da
@@ -503,58 +548,108 @@ async function estimateTransferFeeRaw(
   };
 }
 
+/**
+ * pending   = recebida/aceita no mempool, ainda sem resultado final;
+ * confirmed = ACCEPTED_ON_L2/L1 com execution_status SUCCEEDED explícito;
+ * reverted  = executada e revertida (taxa cobrada, valor não saiu);
+ * rejected  = recusada pela rede (não entrou em bloco);
+ * timeout   = o prazo de espera acabou SEM resultado — NÃO é falha: a
+ *             transação pode entrar depois. Nunca reenviar automaticamente.
+ */
+export type StarknetTxStatus = 'pending' | 'confirmed' | 'reverted' | 'rejected' | 'timeout';
+
+/** Classifica o status bruto do nó. Ausência de execution_status nunca vira sucesso. */
+export function classifyStarknetTxStatus(
+  raw: { finality_status?: string | null; execution_status?: string | null } | null | undefined,
+): Exclude<StarknetTxStatus, 'timeout'> {
+  const fin = String(raw?.finality_status || '').toUpperCase();
+  const exec = String(raw?.execution_status || '').toUpperCase();
+  if (fin === 'REJECTED') return 'rejected';
+  if (exec === 'REVERTED') return 'reverted';
+  if ((fin === 'ACCEPTED_ON_L2' || fin === 'ACCEPTED_ON_L1') && exec === 'SUCCEEDED') return 'confirmed';
+  return 'pending';
+}
+
 export type StarknetTxOutcome = {
   txHash: string;
-  status: 'succeeded' | 'reverted' | 'rejected';
+  status: StarknetTxStatus;
   finality: string | null;
   blockNumber: number | null;
   actualFee: bigint | null;
   revertReason?: string;
 };
 
+function isTxNotFound(err: unknown): boolean {
+  return /transaction hash not found|TXN_HASH_NOT_FOUND|"code":\s*29\b|\b29\b: Transaction hash not found/i.test(
+    String((err as any)?.message || err || ''),
+  );
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Espera o resultado da transação consultando o status (leitura com troca de
+ * nó). Só devolve 'confirmed' com finalidade aceita E execução SUCCEEDED.
+ * Prazo esgotado devolve 'timeout' (não lança): a transação pode entrar depois.
+ */
 export async function waitForStarknetTransaction(
   txHash: string,
   network: StarknetNetworkName = getStarknetNetworkName(),
   opts: { timeoutMs?: number; retryIntervalMs?: number } = {},
 ): Promise<StarknetTxOutcome> {
-  const timeoutMs = opts.timeoutMs ?? 180_000;
-  const provider = createStarknetProvider(RPC_URLS[network][0], network);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new StarknetError('TX_TIMEOUT', 'A rede ainda não confirmou. Acompanhe pelo explorador.')),
-      timeoutMs,
-    );
-  });
+  const hash = pad64(txHash);
+  const deadline = Date.now() + (opts.timeoutMs ?? 180_000);
+  const interval = opts.retryIntervalMs ?? 3_000;
+  let last: { finality_status?: string; execution_status?: string } | null = null;
+  for (;;) {
+    try {
+      last = (await withStarknetRpc((p) => p.getTransactionStatus(hash) as any, network)) as any;
+    } catch (err) {
+      // Ainda não visto pelo nó (ou nó fora): continua pendente até o prazo.
+      if (!isTxNotFound(err) && !(err instanceof StarknetError && err.code === 'RPC_UNAVAILABLE')) throw err;
+      last = null;
+    }
+    const status = classifyStarknetTxStatus(last);
+    if (status === 'rejected') {
+      return { txHash: hash, status, finality: last?.finality_status ?? null, blockNumber: null, actualFee: null };
+    }
+    if (status === 'confirmed' || status === 'reverted') {
+      let receipt: any = null;
+      try {
+        receipt = await withStarknetRpc((p) => p.getTransactionReceipt(hash) as any, network);
+      } catch {
+        receipt = null; // o status já é final; recibo é só detalhe (bloco/taxa)
+      }
+      const value = receipt?.value ?? receipt;
+      const fee = value?.actual_fee?.amount;
+      return {
+        txHash: hash,
+        status,
+        finality: last?.finality_status ?? null,
+        blockNumber: typeof value?.block_number === 'number' ? value.block_number : null,
+        actualFee: fee != null ? BigInt(fee) : null,
+        ...(status === 'reverted' ? { revertReason: String(value?.revert_reason || '').slice(0, 300) } : {}),
+      };
+    }
+    if (Date.now() + interval > deadline) {
+      return { txHash: hash, status: 'timeout', finality: last?.finality_status ?? null, blockNumber: null, actualFee: null };
+    }
+    await sleep(interval);
+  }
+}
+
+/** Transmite e traduz falha de transporte; nunca tenta outro nó (evita duplicar). */
+async function broadcast<T>(fn: () => Promise<T>): Promise<T> {
   try {
-    const receipt: any = await Promise.race([
-      provider.waitForTransaction(txHash, {
-        retryInterval: opts.retryIntervalMs ?? 3_000,
-        successStates: ['ACCEPTED_ON_L2', 'ACCEPTED_ON_L1'] as any,
-      }),
-      timeout,
-    ]);
-    const value = receipt?.value ?? receipt;
-    const exec = String(value?.execution_status || '').toUpperCase();
-    const fee = value?.actual_fee?.amount;
-    return {
-      txHash: pad64(txHash),
-      status: exec === 'REVERTED' ? 'reverted' : 'succeeded',
-      finality: value?.finality_status ?? null,
-      blockNumber: typeof value?.block_number === 'number' ? value.block_number : null,
-      actualFee: fee != null ? BigInt(fee) : null,
-      ...(exec === 'REVERTED' ? { revertReason: String(value?.revert_reason || '').slice(0, 300) } : {}),
-    };
+    return await fn();
   } catch (err) {
-    if (err instanceof StarknetError) throw err;
-    const msg = String((err as any)?.message || err);
-    if (/REJECTED/i.test(msg)) return { txHash: pad64(txHash), status: 'rejected', finality: null, blockNumber: null, actualFee: null };
-    if (/REVERTED/i.test(msg)) {
-      return { txHash: pad64(txHash), status: 'reverted', finality: null, blockNumber: null, actualFee: null, revertReason: msg.slice(0, 300) };
+    if (isStarknetTransportError(err)) {
+      throw new StarknetError(
+        'BROADCAST_FAILED',
+        'Não foi possível enviar à rede agora. Confira o histórico antes de tentar de novo.',
+      );
     }
     throw err;
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }
 
@@ -577,13 +672,14 @@ function broadcastProvider(network: StarknetNetworkName): RpcProvider {
 export async function deployStarknetAccount(
   keys: StarknetAccountKeys,
   network: StarknetNetworkName = getStarknetNetworkName(),
-  opts: { wait?: boolean } = {},
+  opts: { wait?: boolean; waitOptions?: { timeoutMs?: number; retryIntervalMs?: number } } = {},
 ): Promise<StarknetTxOutcome & { alreadyDeployed?: boolean }> {
   assertSigningKeys(keys);
   return serialized(keys.address, async () => {
     const state = await getStarknetAccountState(keys.address, network);
     if (state.deployed) {
-      return { txHash: '', status: 'succeeded', finality: null, blockNumber: null, actualFee: null, alreadyDeployed: true };
+      // Sem transação: o estado veio da própria rede (classe na conta).
+      return { txHash: '', status: 'confirmed', finality: null, blockNumber: null, actualFee: null, alreadyDeployed: true };
     }
     const quote = await estimateStarknetDeployFee(keys, network);
     const strk = await getStarknetTokenBalance(keys.address, 'STRK', network);
@@ -593,11 +689,16 @@ export async function deployStarknetAccount(
         `Para ativar a conta é preciso ter ao menos ${formatStarknetAmount(quote.maxFee)} STRK neste endereço.`,
       );
     }
-    const res = await accountFor(keys, broadcastProvider(network)).deployAccount(deployPayload(keys));
+    const res = await broadcast(() => accountFor(keys, broadcastProvider(network)).deployAccount(deployPayload(keys)));
     const txHash = pad64(res.transaction_hash);
-    if (opts.wait === false) return { txHash, status: 'succeeded', finality: 'RECEIVED', blockNumber: null, actualFee: null };
-    const out = await waitForStarknetTransaction(txHash, network);
-    if (out.status !== 'succeeded') throw new StarknetError(out.status === 'reverted' ? 'TX_REVERTED' : 'TX_REJECTED', 'A ativação da conta falhou na rede.');
+    if (opts.wait === false) return { txHash, status: 'pending', finality: 'RECEIVED', blockNumber: null, actualFee: null };
+    const out = await waitForStarknetTransaction(txHash, network, opts.waitOptions);
+    if (out.status === 'reverted') throw new StarknetError('TX_REVERTED', 'A ativação da conta foi revertida pela rede.');
+    if (out.status === 'rejected') throw new StarknetError('TX_REJECTED', 'A rede rejeitou a ativação da conta.');
+    if (out.status !== 'confirmed') {
+      // Sem resultado ainda: não segue para a transferência (ela falharia).
+      throw new StarknetError('TX_TIMEOUT', `A ativação foi enviada (${txHash}) e ainda não confirmou. Tente de novo em alguns minutos.`);
+    }
     return out;
   });
 }
@@ -612,6 +713,8 @@ export interface SendStarknetTokenParams {
   autoDeploy?: boolean;
   /** Espera a confirmação. Padrão: true. */
   wait?: boolean;
+  /** Prazo/intervalo da espera (padrão 180 s / 3 s). */
+  waitOptions?: { timeoutMs?: number; retryIntervalMs?: number };
 }
 
 export interface SendStarknetTokenResult extends StarknetTxOutcome {
@@ -649,23 +752,25 @@ export async function sendStarknetToken(
 
   let deployTxHash: string | undefined;
   if (quote.includesDeploy) {
-    const dep = await deployStarknetAccount(keys, network, { wait: true });
+    const dep = await deployStarknetAccount(keys, network, { wait: true, waitOptions: params.waitOptions });
     deployTxHash = dep.txHash || undefined;
   }
 
   return serialized(keys.address, async () => {
     const call = buildStarknetTransferCall(token, to, amount);
-    const res = await accountFor(keys, broadcastProvider(network)).execute(call);
+    const res = await broadcast(() => accountFor(keys, broadcastProvider(network)).execute(call));
     const txHash = pad64(res.transaction_hash);
     const explorerUrl = getStarknetExplorerTxUrl(txHash, network);
     if (params.wait === false) {
-      return { txHash, status: 'succeeded', finality: 'RECEIVED', blockNumber: null, actualFee: null, deployTxHash, explorerUrl };
+      return { txHash, status: 'pending', finality: 'RECEIVED', blockNumber: null, actualFee: null, deployTxHash, explorerUrl };
     }
-    const out = await waitForStarknetTransaction(txHash, network);
+    const out = await waitForStarknetTransaction(txHash, network, params.waitOptions);
     if (out.status === 'reverted') {
       throw new StarknetError('TX_REVERTED', `A rede recusou a transferência (${txHash}).`);
     }
     if (out.status === 'rejected') throw new StarknetError('TX_REJECTED', 'A rede rejeitou a transação.');
+    // confirmed, ou timeout (enviada, resultado ainda não visto): devolve o
+    // hash com o estado real; quem chama NUNCA deve reenviar por timeout.
     return { ...out, deployTxHash, explorerUrl };
   });
 }

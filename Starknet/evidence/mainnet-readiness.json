@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-11-20T23:38:31.495Z",
+  "readOnly": true,
+  "releaseApproved": false,
+  "moduleMainnetRpcUrls": [],
+  "candidate": {
+    "chainId": "0x534e5f4d41494e",
+    "rpcUrls": [
+      "https://api.zan.top/public/starknet-mainnet/rpc/v0_9",
+      "https://starknet-rpc.publicnode.com"
+    ],
+    "explorerUrl": "https://voyager.online",
+    "accountClassHash": "0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381"
+  },
+  "moduleRefusesMainnet": true,
+  "nodes": [
+    {
+      "url": "https://api.zan.top/public/starknet-mainnet/rpc/v0_9",
+      "chainId": "0x534e5f4d41494e",
+      "chainIdOk": true,
+      "block": 18285239,
+      "tokens": {
+        "ETH": {
+          "address": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+          "symbol": "ETH",
+          "decimals": 18,
+          "ok": true
+        },
+        "STRK": {
+          "address": "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+          "symbol": "STRK",
+          "decimals": 18,
+          "ok": true
+        }
+      },
+      "accountClass": {
+        "classHash": "0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381",
+        "declared": true,
+        "recomputedHashMatches": true,
+        "constructor": "public_key:core::felt252"
+      },
+      "sepoliaClassOnMainnet": "not declared (por isso a mainnet usa a OZ 3.x)"
+    },
+    {
+      "url": "https://starknet-rpc.publicnode.com",
+      "chainId": "0x534e5f4d41494e",
+      "chainIdOk": true,
+      "block": 18285242,
+      "tokens": {
+        "ETH": {
+          "address": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+          "symbol": "ETH",
+          "decimals": 18,
+          "ok": true
+        },
+        "STRK": {
+          "address": "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+          "symbol": "STRK",
+          "decimals": 18,
+          "ok": true
+        }
+      },
+      "accountClass": {
+        "classHash": "0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381",
+        "declared": true,
+        "recomputedHashMatches": true,
+        "constructor": "public_key:core::felt252"
+      },
+      "sepoliaClassOnMainnet": "not declared (por isso a mainnet usa a OZ 3.x)"
+    }
+  ]
+}
