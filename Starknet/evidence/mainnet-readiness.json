@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-20T23:38:31.495Z",
+  "generatedAt": "2026-11-20T23:59:47.328Z",
   "readOnly": true,
   "releaseApproved": false,
   "moduleMainnetRpcUrls": [],
@@ -18,7 +18,7 @@
       "url": "https://api.zan.top/public/starknet-mainnet/rpc/v0_9",
       "chainId": "0x534e5f4d41494e",
       "chainIdOk": true,
-      "block": 18285239,
+      "block": 18285998,
       "tokens": {
         "ETH": {
           "address": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
@@ -39,13 +39,13 @@
         "recomputedHashMatches": true,
         "constructor": "public_key:core::felt252"
       },
-      "sepoliaClassOnMainnet": "not declared (por isso a mainnet usa a OZ 3.x)"
+      "sepoliaClassOnMainnet": "not declared (por isso o padrão é a OZ 3.x nas duas redes)"
     },
     {
       "url": "https://starknet-rpc.publicnode.com",
       "chainId": "0x534e5f4d41494e",
       "chainIdOk": true,
-      "block": 18285242,
+      "block": 18285999,
       "tokens": {
         "ETH": {
           "address": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
@@ -66,7 +66,7 @@
         "recomputedHashMatches": true,
         "constructor": "public_key:core::felt252"
       },
-      "sepoliaClassOnMainnet": "not declared (por isso a mainnet usa a OZ 3.x)"
+      "sepoliaClassOnMainnet": "not declared (por isso o padrão é a OZ 3.x nas duas redes)"
     }
   ]
 }

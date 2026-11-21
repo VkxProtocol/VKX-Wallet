@@ -184,5 +184,85 @@
     "recipientBalanceBefore": "250000000000000000",
     "recipientBalanceAfter": "300000000000000000",
     "explorer": "https://sepolia.voyager.online/tx/0x04c37860334abf98f8562a5ee37a06323c54d06cfd4ff7d82f073f545a7f810c"
+  },
+  {
+    "at": "2026-11-20T23:56:32.668Z",
+    "network": "starknet-sepolia",
+    "chainId": "0x534e5f5345504f4c4941",
+    "kind": "transfer",
+    "token": "STRK",
+    "amount": "2",
+    "from": "0x0279042774675b647df5f1214bc50584a9c70ffad80cfc52542d43bdc61d0d5d",
+    "to": "0x002ca0c39440adaf2a5b7a9fde50d1b9983571af643c44c021a6213cf290fcae",
+    "txHash": "0x0497b7f1f4f3d8d15f43e3a2df5e2656412c55b492f5337958ce0b1cc41d78df",
+    "result": "confirmed",
+    "finality": "ACCEPTED_ON_L2",
+    "blockNumber": 18456112,
+    "actualFeeFri": "48242440083218527",
+    "recipientBalanceBefore": "0",
+    "recipientBalanceAfter": "2000000000000000000",
+    "recipientReceived": "2",
+    "explorer": "https://sepolia.voyager.online/tx/0x0497b7f1f4f3d8d15f43e3a2df5e2656412c55b492f5337958ce0b1cc41d78df"
+  },
+  {
+    "at": "2026-11-20T23:57:04.699Z",
+    "network": "starknet-sepolia",
+    "chainId": "0x534e5f5345504f4c4941",
+    "kind": "deploy_account",
+    "address": "0x002ca0c39440adaf2a5b7a9fde50d1b9983571af643c44c021a6213cf290fcae",
+    "txHash": "0x07a770ff61529c1a39fc31ad7964aefc595fc349967c27c9b2b9926ebd665c89",
+    "result": "succeeded",
+    "explorer": "https://sepolia.voyager.online/tx/0x07a770ff61529c1a39fc31ad7964aefc595fc349967c27c9b2b9926ebd665c89"
+  },
+  {
+    "at": "2026-11-20T23:57:04.700Z",
+    "network": "starknet-sepolia",
+    "chainId": "0x534e5f5345504f4c4941",
+    "kind": "transfer",
+    "token": "STRK",
+    "amount": "0.1",
+    "from": "0x002ca0c39440adaf2a5b7a9fde50d1b9983571af643c44c021a6213cf290fcae",
+    "to": "0x001be1698292b9e1a35240e66a26f1b972945e4f9c598370072b81a92185422f",
+    "txHash": "0x00366e0e265ac1ad4fb005174ac2d73db29d2ed4da19c57a2cbe048be7c98e71",
+    "result": "confirmed",
+    "finality": "ACCEPTED_ON_L2",
+    "blockNumber": 18456130,
+    "actualFeeFri": "48614344151587071",
+    "recipientBalanceBefore": "0",
+    "recipientBalanceAfter": "100000000000000000",
+    "recipientReceived": "0.1",
+    "explorer": "https://sepolia.voyager.online/tx/0x00366e0e265ac1ad4fb005174ac2d73db29d2ed4da19c57a2cbe048be7c98e71"
+  },
+  {
+    "at": "2026-11-20T23:57:10.511Z",
+    "network": "starknet-sepolia",
+    "chainId": "0x534e5f5345504f4c4941",
+    "kind": "status",
+    "accounts": [
+      {
+        "label": "conta 0",
+        "address": "0x002ca0c39440adaf2a5b7a9fde50d1b9983571af643c44c021a6213cf290fcae",
+        "publicKey": "0x067d04bf79f1729861cd1823da1a33771d990cf70fe8a671656347c49b386be0",
+        "classHash": "0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381",
+        "derivationPath": "m/44'/9004'/0'/0/0",
+        "deployed": true,
+        "balances": {
+          "ETH": "0",
+          "STRK": "1789061438256522522"
+        }
+      },
+      {
+        "label": "conta 1",
+        "address": "0x001be1698292b9e1a35240e66a26f1b972945e4f9c598370072b81a92185422f",
+        "publicKey": "0x06f2ef9e1886c9aefdf7a92656c091e1cf654bec500a0f50b86bd6377acb016b",
+        "classHash": "0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381",
+        "derivationPath": "m/44'/9004'/0'/0/1",
+        "deployed": false,
+        "balances": {
+          "ETH": "0",
+          "STRK": "100000000000000000"
+        }
+      }
+    ]
   }
 ]

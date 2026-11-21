@@ -18,6 +18,8 @@ import {
   type StarknetTokenSymbol,
   deployStarknetAccount,
   deriveStarknetAccountFromMnemonic,
+  OZ_ACCOUNT_CLASS_HASH_V4_LEGACY,
+  STARKNET_ACCOUNT_CLASS_HASH,
   estimateStarknetDeployFee,
   formatStarknetAmount,
   getStarknetAccountState,
@@ -42,9 +44,13 @@ function mnemonicFile(): string {
   return f;
 }
 
+// Padrão: classe OZ 3.x (opção C). --legado: contas antigas da PoC (classe 4.x).
+const LEGACY = process.argv.includes('--legado');
+const CLASS = LEGACY ? OZ_ACCOUNT_CLASS_HASH_V4_LEGACY : STARKNET_ACCOUNT_CLASS_HASH;
+
 function loadAccounts(): { a0: StarknetAccountKeys; a1: StarknetAccountKeys } {
   const phrase = fs.readFileSync(mnemonicFile(), 'utf8').trim();
-  return { a0: deriveStarknetAccountFromMnemonic(phrase, 0), a1: deriveStarknetAccountFromMnemonic(phrase, 1) };
+  return { a0: deriveStarknetAccountFromMnemonic(phrase, 0, CLASS), a1: deriveStarknetAccountFromMnemonic(phrase, 1, CLASS) };
 }
 
 function appendEvidence(entry: Record<string, unknown>) {
@@ -70,7 +76,7 @@ async function status() {
 }
 
 async function main() {
-  const [cmd, ...args] = process.argv.slice(2);
+  const [cmd, ...args] = process.argv.slice(2).filter((a) => a !== '--legado');
   if (cmd === 'new') {
     const f = mnemonicFile();
     if (fs.existsSync(f)) return console.log('Frase de teste já existe; nada feito.');

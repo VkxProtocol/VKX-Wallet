@@ -10,7 +10,11 @@
 // Se este teste falhar, corrija o código — nunca o vetor.
 import assert from 'node:assert/strict';
 import {
-  OZ_ACCOUNT_CLASS_HASH,
+  STARKNET_ACCOUNT_CLASS_HASH,
+  OZ_ACCOUNT_CLASS_HASH_V4_LEGACY,
+  starknetAccountCandidatesFromMnemonic,
+  selectStarknetAccountForAddress,
+  discoverStarknetAccount,
   StarknetError,
   __resetStarknetSendQueue,
   checkStarknetAddress,
@@ -41,7 +45,8 @@ import {
 
 const PHRASE = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
-const VECTORS = [
+// LEGADO 4.x (Fases 1–2): mesmas chaves, endereço com a classe 4.x.
+const LEGACY_V4_VECTORS = [
   {
     index: 0,
     path: "m/44'/9004'/0'/0/0",
@@ -64,6 +69,18 @@ const VECTORS = [
     address: '0x029c0394792551af2120ea912ed40d6bfe32770c0cb9003466479cd18b7b9e21',
   },
 ];
+
+// PADRÃO (opção C, 20/11/2026): classe OZ 3.x nas duas redes. Chaves iguais às
+// do legado (a classe não muda a chave); endereços calculados pela referência
+// Rust (starknet-core::get_contract_address) com a classe 3.x.
+const VECTORS = LEGACY_V4_VECTORS.map((v, i) => ({
+  ...v,
+  address: [
+    '0x02000ba5ba904aed0858233e8f782bbc07fd31298824074e05a871f28642342c',
+    '0x01bb6a88898af0b5a40b60654ba38c802790d27aecbb34483ff1a91c7584a683',
+    '0x04521d736e74420c14b90e6c9ad74c073c84174b75c51038f9333cf9d32b904c',
+  ][i],
+}));
 
 // Sementes em que o 1º sha256 cai acima do limite: o grind precisa de 2+ voltas.
 const GRIND_VECTORS = [
@@ -108,6 +125,8 @@ const sim = {
   // status devolvido por starknet_getTransactionStatus; null = "hash não encontrado"
   txStatus: undefined as undefined | null | { finality_status?: string; execution_status?: string },
   failBroadcastUrl: '' as string,
+  deployedSet: null as null | Set<bigint>,
+  strkByAddr: null as null | Map<bigint, bigint>,
   estimateRevertsWith: '' as string,
 };
 
@@ -122,13 +141,18 @@ function rpcResult(req: { method: string; params: any }, url: string): { result?
   switch (req.method) {
     case 'starknet_specVersion': return { result: '0.9.0' };
     case 'starknet_chainId': return { result: '0x534e5f5345504f4c4941' };
-    case 'starknet_getClassHashAt':
-      return sim.deployed ? { result: OZ_ACCOUNT_CLASS_HASH } : { error: { code: 20, message: 'Contract not found' } };
+    case 'starknet_getClassHashAt': {
+      const isDeployed = sim.deployedSet ? sim.deployedSet.has(BigInt(req.params.contract_address)) : sim.deployed;
+      return isDeployed ? { result: STARKNET_ACCOUNT_CLASS_HASH } : { error: { code: 20, message: 'Contract not found' } };
+    }
     case 'starknet_getClassAt':
       return sim.deployed ? { result: { sierra_program: [], contract_class_version: '0.1.0', entry_points_by_type: {}, abi: '[]' } } : { error: { code: 20, message: 'Contract not found' } };
     case 'starknet_call': {
       const token = Object.entries(STARKNET_TOKENS).find(([, t]) => BigInt(t.address) === BigInt(req.params.request.contract_address))?.[0];
-      const v = sim.balances[token || ''] ?? 0n;
+      const owner = BigInt(req.params.request.calldata[0]);
+      const v = sim.strkByAddr
+        ? (token === 'STRK' ? sim.strkByAddr.get(owner) ?? 0n : 0n)
+        : sim.balances[token || ''] ?? 0n;
       return { result: ['0x' + (v & ((1n << 128n) - 1n)).toString(16), '0x' + (v >> 128n).toString(16)] };
     }
     case 'starknet_estimateFee':
@@ -183,6 +207,8 @@ function resetSim() {
   sim.estimateRevertsWith = '';
   sim.txStatus = undefined;
   sim.failBroadcastUrl = '';
+  sim.deployedSet = null;
+  sim.strkByAddr = null;
   __resetStarknetSendQueue();
 }
 
@@ -199,7 +225,10 @@ const ONE = 10n ** 18n;
       assert.equal(a.privateKey, v.privateKey);
       assert.equal(a.publicKey, v.publicKey);
       assert.equal(a.address, v.address);
-      assert.equal(a.classHash, OZ_ACCOUNT_CLASS_HASH);
+      assert.equal(a.classHash, STARKNET_ACCOUNT_CLASS_HASH);
+    }
+    for (const v of LEGACY_V4_VECTORS) {
+      assert.equal(deriveStarknetAccountFromMnemonic(PHRASE, v.index, OZ_ACCOUNT_CLASS_HASH_V4_LEGACY).address, v.address);
     }
   });
 
@@ -249,10 +278,10 @@ const ONE = 10n ** 18n;
 
   // --- Validação de endereço / valores -------------------------------------
   await test('validação de endereço', () => {
-    assert.deepEqual(checkStarknetAddress(VECTORS[1].address), { ok: true, address: VECTORS[1].address });
+    assert.deepEqual(checkStarknetAddress(LEGACY_V4_VECTORS[1].address), { ok: true, address: LEGACY_V4_VECTORS[1].address });
     // sem zeros à esquerda normaliza para 64 hex
-    assert.deepEqual(checkStarknetAddress('0xcb064ea1d78165d671e1303036a657b197b287481807d1442d10fa1ef52f5b'), { ok: true, address: VECTORS[1].address });
-    assert.equal(checkStarknetAddress(`  ${VECTORS[0].address.toUpperCase().replace('0X', '0x')}  `).ok, true);
+    assert.deepEqual(checkStarknetAddress('0xcb064ea1d78165d671e1303036a657b197b287481807d1442d10fa1ef52f5b'), { ok: true, address: LEGACY_V4_VECTORS[1].address });
+    assert.equal(checkStarknetAddress(`  ${LEGACY_V4_VECTORS[0].address.toUpperCase().replace('0X', '0x')}  `).ok, true);
     const evm = checkStarknetAddress('0x52908400098527886E0F7030069857D2E4169EE7');
     assert.equal(evm.ok, false);
     assert.equal(!evm.ok && evm.code, 'EVM_ADDRESS');
@@ -295,7 +324,7 @@ const ONE = 10n ** 18n;
 
   await test('estado da conta: implantada x não implantada', async () => {
     resetSim();
-    assert.deepEqual(await getStarknetAccountState(VECTORS[0].address, 'sepolia'), { deployed: true, classHash: OZ_ACCOUNT_CLASS_HASH });
+    assert.deepEqual(await getStarknetAccountState(VECTORS[0].address, 'sepolia'), { deployed: true, classHash: STARKNET_ACCOUNT_CLASS_HASH });
     sim.deployed = false;
     assert.deepEqual(await getStarknetAccountState(VECTORS[0].address, 'sepolia'), { deployed: false, classHash: null });
   });
@@ -389,7 +418,7 @@ const ONE = 10n ** 18n;
     const adds = rpcLog.filter((r) => r.method.startsWith('starknet_add')).map((r) => r.method);
     assert.deepEqual(adds, ['starknet_addDeployAccountTransaction', 'starknet_addInvokeTransaction']);
     const dep = rpcLog.find((r) => r.method === 'starknet_addDeployAccountTransaction')!.params.deploy_account_transaction;
-    assert.equal(BigInt(dep.class_hash), BigInt(OZ_ACCOUNT_CLASS_HASH));
+    assert.equal(BigInt(dep.class_hash), BigInt(STARKNET_ACCOUNT_CLASS_HASH));
     assert.equal(BigInt(dep.contract_address_salt), BigInt(keys.publicKey));
     assert.deepEqual(dep.constructor_calldata.map((x: string) => BigInt(x)), [BigInt(keys.publicKey)]);
     assert.equal(res.status, 'confirmed');
@@ -536,21 +565,82 @@ const ONE = 10n ** 18n;
     assert.equal(STARKNET_MAINNET_CANDIDATE.chainId, '0x534e5f4d41494e');
     assert.equal(STARKNET_MAINNET_CANDIDATE.accountClassHash, OZ_ACCOUNT_CLASS_HASH_V3);
     assert.equal(starknetAccountClassHash('mainnet'), OZ_ACCOUNT_CLASS_HASH_V3);
-    assert.equal(starknetAccountClassHash('sepolia'), OZ_ACCOUNT_CLASS_HASH);
+    assert.equal(starknetAccountClassHash('sepolia'), STARKNET_ACCOUNT_CLASS_HASH);
     resetSim();
     await expectCode(waitForStarknetTransaction('0xabc1', 'mainnet', FAST), 'NETWORK_DISABLED');
     await expectCode(deployStarknetAccount(keys, 'mainnet'), 'NETWORK_DISABLED');
     assert.equal(bodies.length, 0, 'nenhuma requisição para mainnet');
   });
 
-  await test('OZ 3.x: endereços batem com a referência Rust (starknet-core)', () => {
+  await test('OZ 3.x (padrão): endereços batem com a referência Rust (starknet-core)', () => {
     // Calculados com reference/rust (key <classe 3.x> <chave>) em 20/11/2026.
     assert.equal(deriveStarknetAccountFromMnemonic(PHRASE, 0, OZ_ACCOUNT_CLASS_HASH_V3).address,
       '0x02000ba5ba904aed0858233e8f782bbc07fd31298824074e05a871f28642342c');
     assert.equal(deriveStarknetAccountFromMnemonic(PHRASE, 1, OZ_ACCOUNT_CLASS_HASH_V3).address,
       '0x01bb6a88898af0b5a40b60654ba38c802790d27aecbb34483ff1a91c7584a683');
     // mesma chave, classe diferente => endereço diferente (a classe define a conta)
-    assert.notEqual(deriveStarknetAccountFromMnemonic(PHRASE, 0, OZ_ACCOUNT_CLASS_HASH_V3).address, VECTORS[0].address);
+    assert.notEqual(deriveStarknetAccountFromMnemonic(PHRASE, 0, OZ_ACCOUNT_CLASS_HASH_V3).address, LEGACY_V4_VECTORS[0].address);
+  });
+
+  // ---------------- Opção C: paridade e legado ----------------
+  await test('paridade: mesma frase/índice/classe = mesmo endereço na Sepolia e na mainnet', () => {
+    assert.equal(starknetAccountClassHash('sepolia'), starknetAccountClassHash('mainnet'));
+    assert.equal(STARKNET_ACCOUNT_CLASS_HASH, OZ_ACCOUNT_CLASS_HASH_V3);
+    for (const v of VECTORS) {
+      const sep = deriveStarknetAccountFromMnemonic(PHRASE, v.index, starknetAccountClassHash('sepolia'));
+      const main = deriveStarknetAccountFromMnemonic(PHRASE, v.index, starknetAccountClassHash('mainnet'));
+      assert.equal(sep.address, main.address);
+      assert.equal(sep.address, v.address);
+    }
+  });
+
+  await test('candidatos: padrão 3.x primeiro, legado 4.x depois; seleção pelo endereço salvo', () => {
+    const c = starknetAccountCandidatesFromMnemonic(PHRASE, 0);
+    assert.deepEqual(c.map((x) => [x.address, x.legacy]), [[VECTORS[0].address, false], [LEGACY_V4_VECTORS[0].address, true]]);
+    assert.equal(selectStarknetAccountForAddress(c, LEGACY_V4_VECTORS[0].address)?.legacy, true);
+    assert.equal(selectStarknetAccountForAddress(c, VECTORS[0].address.replace('0x0', '0x'))?.legacy, false);
+    assert.equal(selectStarknetAccountForAddress(c, '0x52908400098527886E0F7030069857D2E4169EE7'), null); // EVM nunca casa
+    assert.equal(selectStarknetAccountForAddress(c, null), null);
+  });
+
+  await test('descoberta: 3.x vazia + 4.x com atividade = legado; senão sempre 3.x', async () => {
+    const c = starknetAccountCandidatesFromMnemonic(PHRASE, 0);
+    resetSim();
+    sim.deployedSet = new Set([BigInt(LEGACY_V4_VECTORS[0].address)]);
+    sim.strkByAddr = new Map();
+    assert.equal((await discoverStarknetAccount(c, 'sepolia')).legacy, true, 'conta antiga implantada é reconhecida');
+    resetSim();
+    sim.deployedSet = new Set();
+    sim.strkByAddr = new Map([[BigInt(LEGACY_V4_VECTORS[0].address), 5n]]);
+    assert.equal((await discoverStarknetAccount(c, 'sepolia')).legacy, true, 'conta antiga só com saldo é reconhecida');
+    resetSim();
+    sim.deployedSet = new Set([BigInt(LEGACY_V4_VECTORS[0].address), BigInt(VECTORS[0].address)]);
+    sim.strkByAddr = new Map();
+    assert.equal((await discoverStarknetAccount(c, 'sepolia')).legacy, false, 'com as duas ativas, fica a padrão');
+    resetSim();
+    sim.deployedSet = new Set();
+    sim.strkByAddr = new Map();
+    assert.equal((await discoverStarknetAccount(c, 'sepolia')).legacy, false, 'conta nova = padrão 3.x');
+    resetSim();
+    sim.failUrls = new Set(getStarknetRpcUrls('sepolia'));
+    assert.equal((await discoverStarknetAccount(c, 'sepolia')).legacy, false, 'sem rede, nunca escolhe legado');
+    await expectCode(discoverStarknetAccount(c, 'mainnet').then((r) => { if (r.legacy) throw new Error('legado'); throw new StarknetError('NETWORK_DISABLED', 'ok'); }), 'NETWORK_DISABLED');
+  });
+
+  await test('estimativa reconhece conta legada 4.x pelo endereço e mantém a classe dela', () => {
+    const est = starknetEstimationKeys(LEGACY_V4_VECTORS[0].address, LEGACY_V4_VECTORS[0].publicKey);
+    assert.equal(est.classHash, OZ_ACCOUNT_CLASS_HASH_V4_LEGACY);
+    assert.equal(starknetEstimationKeys(VECTORS[0].address, VECTORS[0].publicKey).classHash, STARKNET_ACCOUNT_CLASS_HASH);
+  });
+
+  await test('envio por conta legada 4.x assina com a classe 4.x (conta existente continua operando)', async () => {
+    resetSim();
+    sim.balances = { ETH: ONE, STRK: 10n * ONE };
+    const legacyKeys = deriveStarknetAccountFromMnemonic(PHRASE, 0, OZ_ACCOUNT_CLASS_HASH_V4_LEGACY);
+    const res = await sendStarknetToken({ keys: legacyKeys, token: 'STRK', to: RECIPIENT, amount: 1n }, 'sepolia');
+    assert.equal(res.status, 'confirmed');
+    const tx = rpcLog.find((r) => r.method === 'starknet_addInvokeTransaction')!.params.invoke_transaction;
+    assert.equal(BigInt(tx.sender_address), BigInt(LEGACY_V4_VECTORS[0].address));
   });
 
   await test('nenhuma chave privada sai em requisição alguma', () => {

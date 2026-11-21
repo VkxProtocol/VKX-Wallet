@@ -6,18 +6,20 @@
 // Rodar: npx tsx scripts/starknet-vectors.ts
 import { HDNodeWallet } from 'ethers';
 import {
-  OZ_ACCOUNT_CLASS_HASH,
+  OZ_ACCOUNT_CLASS_HASH_V4_LEGACY,
+  STARKNET_ACCOUNT_CLASS_HASH,
   deriveStarknetAccountFromMnemonic,
   signStarknetHash,
   starknetDerivationPath,
 } from '../src/starknet';
 
 const PHRASE = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
-console.log(`class_hash;${OZ_ACCOUNT_CLASS_HASH}`);
+console.log(`class_hash;${STARKNET_ACCOUNT_CLASS_HASH}`);
 for (const i of [0, 1, 2]) {
   const bip32 = HDNodeWallet.fromPhrase(PHRASE, undefined, starknetDerivationPath(i)).privateKey;
   const a = deriveStarknetAccountFromMnemonic(PHRASE, i);
-  console.log(`${i};${a.derivationPath};${bip32};${a.privateKey};${a.publicKey};${a.address}`);
+  const legacy = deriveStarknetAccountFromMnemonic(PHRASE, i, OZ_ACCOUNT_CLASS_HASH_V4_LEGACY).address;
+  console.log(`${i};${a.derivationPath};${bip32};${a.privateKey};${a.publicKey};${a.address};legado4x=${legacy}`);
 }
 const a0 = deriveStarknetAccountFromMnemonic(PHRASE, 0);
 const msg = '0x' + 'ab'.repeat(31);

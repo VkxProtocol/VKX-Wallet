@@ -9,7 +9,7 @@ import {
   STARKNET_MAINNET_CANDIDATE,
   STARKNET_MAINNET_RELEASE_APPROVED,
   STARKNET_TOKENS,
-  OZ_ACCOUNT_CLASS_HASH,
+  OZ_ACCOUNT_CLASS_HASH_V4_LEGACY,
   getStarknetRpcUrls,
   getStarknetBalances,
 } from '../src/starknet';
@@ -46,10 +46,10 @@ async function checkNode(url: string) {
       constructor: ctor?.inputs?.map((i: any) => `${i.name}:${i.type}`).join(','),
     };
     try {
-      await p.getClassByHash(OZ_ACCOUNT_CLASS_HASH);
+      await p.getClassByHash(OZ_ACCOUNT_CLASS_HASH_V4_LEGACY);
       out.sepoliaClassOnMainnet = 'declared';
     } catch {
-      out.sepoliaClassOnMainnet = 'not declared (por isso a mainnet usa a OZ 3.x)';
+      out.sepoliaClassOnMainnet = 'not declared (por isso o padrão é a OZ 3.x nas duas redes)';
     }
   } catch (err: any) {
     out.error = String(err?.message || err).slice(0, 200);

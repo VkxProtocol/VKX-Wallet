@@ -47,8 +47,12 @@ export type StarknetTokenSymbol = 'ETH' | 'STRK';
 /** Caminho BIP44 da Starknet (coin type 9004). Índice = índice HD da conta VKX. */
 export const STARKNET_DERIVATION_PATH_BASE = "m/44'/9004'/0'/0";
 
-/** OpenZeppelin AccountUpgradeable, cairo-contracts 4.x (Scarb 2.18.0, --release). Só declarada na Sepolia. */
-export const OZ_ACCOUNT_CLASS_HASH =
+/**
+ * LEGADO — OpenZeppelin AccountUpgradeable 4.x (Scarb 2.18.0, --release). Só
+ * declarada na Sepolia. Usada pelas contas de teste da PoC (Fases 1–2); fica
+ * apenas para RECUPERAR essas contas. Contas novas usam a 3.x.
+ */
+export const OZ_ACCOUNT_CLASS_HASH_V4_LEGACY =
   '0x03013bf2edcf93ac575367eee41cd07bb50e809c78925817b61878db29826144';
 /**
  * OpenZeppelin AccountUpgradeable, cairo-contracts 3.x (Scarb 2.13.1, --release).
@@ -80,9 +84,18 @@ export const STARKNET_MAINNET_CANDIDATE = Object.freeze({
   accountClassHash: OZ_ACCOUNT_CLASS_HASH_V3,
 });
 
+/**
+ * Classe PADRÃO (decisão do dono, opção C, 20/11/2026): OZ 3.x nas DUAS redes,
+ * então a mesma frase/índice gera o MESMO endereço na Sepolia e na mainnet.
+ */
+export const STARKNET_ACCOUNT_CLASS_HASH = OZ_ACCOUNT_CLASS_HASH_V3;
+
+/** Classes antigas aceitas só para reconhecer/recuperar contas já existentes. */
+export const STARKNET_LEGACY_ACCOUNT_CLASS_HASHES: readonly string[] = Object.freeze([OZ_ACCOUNT_CLASS_HASH_V4_LEGACY]);
+
 /** Classe da conta usada para CALCULAR o endereço em cada rede. */
 const ACCOUNT_CLASS_BY_NETWORK: Record<'sepolia' | 'mainnet', string> = {
-  sepolia: OZ_ACCOUNT_CLASS_HASH,
+  sepolia: STARKNET_ACCOUNT_CLASS_HASH,
   mainnet: STARKNET_MAINNET_CANDIDATE.accountClassHash,
 };
 
@@ -285,7 +298,7 @@ export function deriveStarknetKeyPairFromMnemonic(mnemonic: string, index: numbe
   return { ...starknetKeyPairFromPrivateKey(grindStarkKey(node.privateKey)), derivationPath };
 }
 
-export function computeStarknetAccountAddress(publicKey: string, classHash: string = OZ_ACCOUNT_CLASS_HASH): string {
+export function computeStarknetAccountAddress(publicKey: string, classHash: string = STARKNET_ACCOUNT_CLASS_HASH): string {
   const pub = pad64(publicKey);
   return pad64(hash.calculateContractAddressFromHash(pub, classHash, [pub], 0));
 }
@@ -293,13 +306,13 @@ export function computeStarknetAccountAddress(publicKey: string, classHash: stri
 export function deriveStarknetAccountFromMnemonic(
   mnemonic: string,
   index: number = 0,
-  classHash: string = OZ_ACCOUNT_CLASS_HASH,
+  classHash: string = STARKNET_ACCOUNT_CLASS_HASH,
 ): StarknetAccountKeys {
   const kp = deriveStarknetKeyPairFromMnemonic(mnemonic, index);
   return { ...kp, address: computeStarknetAccountAddress(kp.publicKey, classHash), classHash: pad64(classHash) };
 }
 
-export function starknetAccountFromPrivateKey(privateKey: string, classHash: string = OZ_ACCOUNT_CLASS_HASH): StarknetAccountKeys {
+export function starknetAccountFromPrivateKey(privateKey: string, classHash: string = STARKNET_ACCOUNT_CLASS_HASH): StarknetAccountKeys {
   const kp = starknetKeyPairFromPrivateKey(privateKey);
   return { ...kp, address: computeStarknetAccountAddress(kp.publicKey, classHash), classHash: pad64(classHash) };
 }
@@ -313,10 +326,12 @@ const ESTIMATE_ONLY_PRIVATE_KEY = `0x${'0'.repeat(63)}1`;
 export function starknetEstimationKeys(address: string, publicKey: string): StarknetAccountKeys {
   const addr = normalizeStarknetAddress(address);
   const pub = pad64(publicKey);
-  if (computeStarknetAccountAddress(pub) !== addr) {
+  const classHash = [STARKNET_ACCOUNT_CLASS_HASH, ...STARKNET_LEGACY_ACCOUNT_CLASS_HASHES]
+    .find((c) => computeStarknetAccountAddress(pub, c) === addr);
+  if (!classHash) {
     throw new StarknetError('INVALID_ADDRESS', 'A chave pública não corresponde a este endereço Starknet.');
   }
-  return { privateKey: ESTIMATE_ONLY_PRIVATE_KEY, publicKey: pub, address: addr, classHash: OZ_ACCOUNT_CLASS_HASH };
+  return { privateKey: ESTIMATE_ONLY_PRIVATE_KEY, publicKey: pub, address: addr, classHash: pad64(classHash) };
 }
 
 /** Antes de transmitir: a chave privada tem de gerar a chave pública e o endereço da conta. */
@@ -326,6 +341,53 @@ function assertSigningKeys(keys: StarknetAccountKeys): void {
     || computeStarknetAccountAddress(kp.publicKey, keys.classHash) !== pad64(keys.address)) {
     throw new StarknetError('INVALID_PRIVATE_KEY', 'A chave não corresponde a esta conta Starknet.');
   }
+}
+
+/** Conta padrão (3.x) e variantes legadas da MESMA chave, nesta ordem. */
+export function starknetAccountCandidatesFromMnemonic(
+  mnemonic: string,
+  index: number = 0,
+): Array<StarknetAccountKeys & { legacy: boolean }> {
+  return [STARKNET_ACCOUNT_CLASS_HASH, ...STARKNET_LEGACY_ACCOUNT_CLASS_HASHES].map((c, i) => ({
+    ...deriveStarknetAccountFromMnemonic(mnemonic, index, c),
+    legacy: i > 0,
+  }));
+}
+
+/** Escolhe o candidato que gera exatamente o endereço informado (ou null). */
+export function selectStarknetAccountForAddress<T extends StarknetAccountKeys>(candidates: T[], address?: string | null): T | null {
+  if (!address) return null;
+  let wanted: bigint;
+  try {
+    wanted = BigInt(String(address).trim());
+  } catch {
+    return null;
+  }
+  return candidates.find((c) => BigInt(c.address) === wanted) || null;
+}
+
+/**
+ * Descoberta SÓ DE LEITURA: usa a conta padrão (3.x), a não ser que ela esteja
+ * vazia (não implantada e sem saldo) e uma variante legada tenha atividade
+ * (implantada ou com saldo) — assim contas antigas não "somem". Falha de rede
+ * mantém a padrão (nunca escolhe legado sem prova).
+ */
+export async function discoverStarknetAccount<T extends StarknetAccountKeys & { legacy: boolean }>(
+  candidates: T[],
+  network: StarknetNetworkName = getStarknetNetworkName(),
+): Promise<T> {
+  const [primary, ...legacy] = candidates;
+  const hasActivity = async (a: StarknetAccountKeys): Promise<boolean> => {
+    const [state, bal] = await Promise.all([getStarknetAccountState(a.address, network), getStarknetBalances(a.address, network)]);
+    return state.deployed || bal.STRK > 0n || bal.ETH > 0n;
+  };
+  try {
+    if (await hasActivity(primary)) return primary;
+    for (const l of legacy) if (await hasActivity(l)) return l;
+  } catch {
+    // sem rede: fica com a padrão
+  }
+  return primary;
 }
 
 /** Só o que pode aparecer em tela/log: endereço e chave pública. */

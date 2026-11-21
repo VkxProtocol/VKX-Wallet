@@ -48,3 +48,7 @@ Starknet Sepolia enabled only by a build-time flag (`EXPO_PUBLIC_STARKNET_NETWOR
 
 Account 1 balance: 0.10 → 0.15 → 0.25 STRK. Fee and account activation are estimated from public data and confirmed by the user before the PIN; signing happens on the device. Screenshots in `screenshots/`.
 
+
+## Architecture decision (2026-11-20)
+
+The account class is now OpenZeppelin `AccountUpgradeable` 3.x (`0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381`) on both Sepolia and mainnet, so one phrase gives one Starknet address on both networks. The 4.x class used in the transactions above is kept as a legacy class to recover those test accounts; they keep their addresses and balances. The default 3.x flow (funding, deployment, transfer) is confirmed on Sepolia — see `README.md` and `MAINNET-READINESS.md`. Mainnet remains locked.
